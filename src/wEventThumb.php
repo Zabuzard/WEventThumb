@@ -1,5 +1,13 @@
 <?php
+/*
+ * Gets the plain content of the event with the given thread id.
+ * This is the content of the threads first post.
+ *
+ * @param eventId The id of the events thread
+ * @return The plain content of the given events first post
+ */
 function getEventContent($eventId) {
+	// NOTE: Method should be replaced by an access to the GruppeW-database
 	$urlOfThread = 'https://www.gruppe-w.de/forum/viewthread.php?thread_id=' . $eventId;
 	$contents = file_get_contents($urlOfThread);
 	preg_match('/<!--forum_thread_prepost_1-->(.+)<!--(?:forum_thread_prepost_2|sub_forum_thread_table)-->/siU', $contents, $firstPostRaw);
@@ -8,14 +16,28 @@ function getEventContent($eventId) {
 	return $firstPost[1];
 }
 
+/*
+ * Extracts the banner image from the given raw post content.
+ *
+ * @param postContent Content of the post to extract banner from
+ * @return The url to the banner included in the given post
+ */
 function extraxtEventBanner($postContent) {
+	// NOTE: If data comes from GruppeW-database this probably
+	// needs to be adjusted to BB-code instead of raw HTML
 	preg_match('/.{1,2000}?<img src=["\'](.{1,150})["\'].{1,500}<strong>.{0,150}W.{0,50}ann\?.{0,50}<\/strong>/siU', $postContent, $imgUrl);
 
 	return $imgUrl[1];
 }
 
+/*
+ * Gets the name represented by the given event type.
+ *
+ * @param eventType Type of the event to get
+ * @return The name represented by the given event type
+ */
 function getNameOfEventType($eventType) {
-	// The mapping used in the forum is probably this one, else adjust
+	// NOTE: The mapping used in the forum is probably this one, else adjust
 	$typeToName = array(
 		19 => 'comp',
 		20 => 'coop+',
@@ -31,6 +53,12 @@ function getNameOfEventType($eventType) {
 	return $typeToName[$eventType];
 }
 
+/*
+ * Loads and returns a handle to the image at the given url.
+ *
+ * @param url The url of the image to load
+ * @return A handle to the image loaded from the given url
+ */
 function loadImage($url) {
 	$imgType = exif_imagetype($url);
 	if ($imgType == IMAGETYPE_GIF) {
@@ -44,16 +72,46 @@ function loadImage($url) {
 	}
 }
 
-function getDefaultEventThumbUrl($eventType) {
-	$newsPre = 'https://www.gruppe-w.de/images/news_cats/news_';
-	$newsSucc = '.jpg';
+/*
+ * Creates and returns a handle to the default thumbnail used for an event
+ * with the given type.
+ * Also sets the output type, should only be used if this default thumbnail sets
+ * the final output image.
+ *
+ * @param eventType The type of the event
+ * @return A handle pointing to the default thumbnail used for an event with the given type
+ */
+function loadDefaultEventThumbUrl($eventType) {
+	$defaultThumbPre = 'https://www.gruppe-w.de/images/news_cats/news_';
+	$defaultThumbSucc = '.jpg';
 	
 	$name = getNameOfEventType($eventType);
+	$defaultThumbUrl = $defaultThumbPre . $name . $defaultThumbSucc;
 	
-	return $newsPre . $name . $newsSucc;
+	$sourceType = exif_imagetype($defaultThumbUrl);
+	if ($sourceType == IMAGETYPE_GIF) {
+		header('Content-Type: image/gif');
+	} else if ($sourceType == IMAGETYPE_JPEG) {
+		header('Content-Type: image/jpeg');
+	} else if ($sourceType == IMAGETYPE_PNG) {
+		header('Content-Type: image/png');
+	} else {
+		header('Content-Type: image/x-ms-bmp');
+	}
+	$defaultThumb = loadImage($defaultThumbUrl);
+	
+	return $defaultThumb;
 }
 
+/*
+ * Gets the url to the sticker representing the given event type.
+ *
+ * @param eventType The type of the event
+ * @return An url pointing to the sticker representing the given event type
+ */
 function getEventTypeStickerUrl($eventType) {
+	// NOTE: Sticker should be selfhosted by GruppeW and also
+	// substituted by high-quality images from the original PSD-Files
 	$stickerPre = 'https://zabuza.pitaya.duckdns.org/w/eventThumb/sticker/sticker_';
 	$stickerSucc = '.png';
 	
@@ -63,6 +121,15 @@ function getEventTypeStickerUrl($eventType) {
 	return $stickerUrl;
 }
 
+/*
+ * Creates and returns a handle to the thumbnail of the given banner.
+ *
+ * @param bannerUrl The url to the banner which should be used as thumbnail template
+ * @param outputWidth The desired width of the thumbnail
+ * @param outputHeight The desired height of the thumbnail
+ * @eventType The type of the event
+ * @return A handle to the created thumbnail
+ */
 function createBannerThumb($bannerUrl, $outputWidth, $outputHeight, $eventType) {
 	list($width, $height) = getimagesize($bannerUrl);
 
@@ -119,20 +186,27 @@ function createBannerThumb($bannerUrl, $outputWidth, $outputHeight, $eventType) 
 	$source = loadImage($bannerUrl);
 
 	// Scale and place background
-	imagecopyresampled($thumb, $source, $backgroundDestX, $backgroundDestY, 0, 0, $backgroundWidth, $backgroundHeight, $width, $height);
+	imagecopyresampled($thumb, $source,
+		$backgroundDestX, $backgroundDestY, 0, 0,
+		$backgroundWidth, $backgroundHeight, $width, $height);
 	// Blur background
 	for ($i = 0; $i < 20; $i++) {
 		imagefilter($thumb, IMG_FILTER_GAUSSIAN_BLUR);
 	}
 
 	// Scale and place foreground
-	imagecopyresampled($thumb, $source, $foregroundDestX, $foregroundDestY, 0, 0, $foregroundWidth, $foregroundHeight, $width, $height);
+	imagecopyresampled($thumb, $source,
+		$foregroundDestX, $foregroundDestY, 0, 0,
+		$foregroundWidth, $foregroundHeight, $width, $height);
 	
 	// Place event type sticker
 	$stickerUrl = getEventTypeStickerUrl($eventType);
 	list($stickerWidth, $stickerHeight) = getimagesize($stickerUrl);
 	$sticker = loadImage($stickerUrl);
-	imagecopyresampled($thumb, $sticker, 3, $outputHeight - (3 + $stickerHeight), 0, 0, $stickerWidth, $stickerHeight, $stickerWidth, $stickerHeight);
+	$stickerSpacing = 3;
+	imagecopyresampled($thumb, $sticker,
+		$stickerSpacing, $outputHeight - ($stickerSpacing + $stickerHeight), 0, 0,
+		$stickerWidth, $stickerHeight, $stickerWidth, $stickerHeight);
 
 	// Draw a black 1px border
 	$blackColor = imagecolorallocate($thumb, 0, 0, 0);
@@ -145,16 +219,25 @@ function createBannerThumb($bannerUrl, $outputWidth, $outputHeight, $eventType) 
 }
 
 // Input
-$outputWidth = 250;
-$outputHeight = 125;
-
 $eventType = $_GET['eventType'];
 $eventId = $_GET['eventId'];
 
+// Desired dimension of thumbnail
+$outputWidth = 250;
+$outputHeight = 125;
+
 // Extract
 $imgUrl = extraxtEventBanner(getEventContent($eventId));
+
 // Create
-$thumb = createBannerThumb($imgUrl, $outputWidth, $outputHeight, $eventType);
+if (empty($imgUrl)) {
+	// Fallback to the default image if banner extraction failed
+	$thumb = loadDefaultEventThumbUrl($eventType);
+} else {
+	$thumb = createBannerThumb($imgUrl, $outputWidth, $outputHeight, $eventType);
+
+}
+
 // Output
 imagejpeg($thumb, null, 100);
 imagedestroy($thumb);
