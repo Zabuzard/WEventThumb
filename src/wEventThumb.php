@@ -244,8 +244,12 @@ if (empty($imgUrl)) {
 	$thumb = loadDefaultEventThumbUrl($eventType);
 } else {
 	$thumb = createBannerThumb($imgUrl, $outputWidth, $outputHeight, $eventType);
-
 }
+
+// Set various headers
+header('Pragma: public');
+header('Cache-Control: max-age=1209600');
+header('Expires: ' . gmdate('D, d M Y H:i:s \G\M\T', time() + 1209600));
 
 // Output
 imagejpeg($thumb, null, 100);
