@@ -1,5 +1,14 @@
 <?php
 /*
+ * Automatically generates thumbnails of banner images of events at 'https://www.gruppe-w.de'.
+ * Has two GET-parameters:
+ * - eventType : The type of the event
+ * - eventId : The id of the thread which contains the banner image to use as template for the thumbnail
+ *
+ * @author Zabuza {@literal <zabuza.dev@gmail.com>}
+ */
+ 
+/*
  * Gets the plain content of the event with the given thread id.
  * This is the content of the threads first post.
  *
